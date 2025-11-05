@@ -389,8 +389,13 @@ async function monitorSellers() {
             );
 
             for (const listing of newListings) {
-              await webhooks.sendNewListingWebhook(webhookUrlListings, listing);
-              await new Promise((resolve) => setTimeout(resolve, 2000)); // Rate limit
+              const success = await webhooks.sendNewListingWebhook(
+                webhookUrlListings,
+                listing
+              );
+              // Wait 2.5 seconds between requests to avoid rate limits (Discord allows ~30/min)
+              // The webhook function will handle rate limit errors with retries
+              await new Promise((resolve) => setTimeout(resolve, 2500));
             }
 
             // Update known listings
@@ -441,8 +446,14 @@ async function monitorSellers() {
             );
 
             for (const item of newSoldItems) {
-              await webhooks.sendSoldItemWebhook(webhookUrlSold, item, ssn);
-              await new Promise((resolve) => setTimeout(resolve, 2000)); // Rate limit
+              const success = await webhooks.sendSoldItemWebhook(
+                webhookUrlSold,
+                item,
+                ssn
+              );
+              // Wait 2.5 seconds between requests to avoid rate limits (Discord allows ~30/min)
+              // The webhook function will handle rate limit errors with retries
+              await new Promise((resolve) => setTimeout(resolve, 2500));
             }
 
             // Update known sold items
