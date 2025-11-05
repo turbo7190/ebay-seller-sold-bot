@@ -30,7 +30,11 @@ async function sendNewListingWebhook(webhookUrl, listing) {
         },
         {
           name: "Seller",
-          value: listing.sellerUsername || "N/A",
+          value: listing.storeName
+            ? `[${
+                listing.sellerUsername || listing.storeName
+              }](https://www.ebay.com/str/${listing.storeName})`
+            : listing.sellerUsername || "N/A",
           inline: true,
         },
         {
@@ -60,11 +64,7 @@ async function sendNewListingWebhook(webhookUrl, listing) {
  * @param {string} sellerUsername - Seller username
  * @returns {Promise<boolean>} Success status
  */
-async function sendSoldItemWebhook(
-  webhookUrl,
-  item,
-  sellerUsername,
-) {
+async function sendSoldItemWebhook(webhookUrl, item, sellerUsername) {
   try {
     const embed = {
       title: `💰 New Item Sold by ${sellerUsername}`,
@@ -88,7 +88,11 @@ async function sendSoldItemWebhook(
         },
         {
           name: "Seller Name",
-          value: sellerUsername || "N/A",
+          value: item.storeName
+            ? `[${sellerUsername || item.storeName}](https://www.ebay.com/str/${
+                item.storeName
+              })`
+            : sellerUsername || "N/A",
           inline: true,
         },
         {

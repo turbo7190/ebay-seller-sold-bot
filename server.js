@@ -390,7 +390,7 @@ async function monitorSellers() {
 
             for (const listing of newListings) {
               await webhooks.sendNewListingWebhook(webhookUrlListings, listing);
-              await new Promise((resolve) => setTimeout(resolve, 1000)); // Rate limit
+              await new Promise((resolve) => setTimeout(resolve, 2000)); // Rate limit
             }
 
             // Update known listings
@@ -442,7 +442,7 @@ async function monitorSellers() {
 
             for (const item of newSoldItems) {
               await webhooks.sendSoldItemWebhook(webhookUrlSold, item, ssn);
-              await new Promise((resolve) => setTimeout(resolve, 1000)); // Rate limit
+              await new Promise((resolve) => setTimeout(resolve, 2000)); // Rate limit
             }
 
             // Update known sold items

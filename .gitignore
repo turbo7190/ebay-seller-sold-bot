@@ -6,4 +6,5 @@ test-results/
 playwright-report/
 playwright/.cache/
 sellers.json
+sellers.json.tmp
 

@@ -10,32 +10,112 @@ const SELLERS_FILE = path.join(__dirname, "..", "sellers.json");
 async function loadSellers() {
   try {
     const data = await fs.readFile(SELLERS_FILE, "utf8");
+
+    // Check if file is empty or only whitespace
+    if (!data || !data.trim()) {
+      console.warn("sellers.json is empty, returning empty array");
+      return [];
+    }
+
     const json = JSON.parse(data);
+
+    // Validate that sellers is an array
+    if (!json || typeof json !== "object") {
+      console.error("Invalid JSON structure in sellers.json, expected object");
+      throw new Error("Invalid JSON structure");
+    }
+
+    if (!Array.isArray(json.sellers)) {
+      console.error("Invalid sellers data, expected array");
+      throw new Error("Invalid sellers data structure");
+    }
+
     return json.sellers || [];
   } catch (error) {
     // If file doesn't exist, return empty array
     if (error.code === "ENOENT") {
       return [];
     }
+
+    // If JSON parse error, log it but don't clear the file
+    if (error instanceof SyntaxError) {
+      console.error("JSON parse error in sellers.json:", error.message);
+      console.error(
+        "File may be corrupted. Please check sellers.json manually."
+      );
+      throw new Error(
+        `Failed to parse sellers.json: ${error.message}. File may be corrupted.`
+      );
+    }
+
     console.error("Error loading sellers:", error.message);
-    return [];
+    throw error; // Re-throw to prevent clearing file
   }
 }
 
 /**
- * Saves sellers to JSON file
+ * Saves sellers to JSON file with atomic write (backup + write)
  * @param {Array} sellers - Array of seller objects
  * @returns {Promise<boolean>} Success status
  */
 async function saveSellers(sellers) {
   try {
+    // Validate sellers is an array
+    if (!Array.isArray(sellers)) {
+      console.error("saveSellers: sellers must be an array");
+      return false;
+    }
+
+    // Create backup before writing
+    let backupData = null;
+    try {
+      const existingData = await fs.readFile(SELLERS_FILE, "utf8");
+      backupData = existingData;
+    } catch (error) {
+      // File doesn't exist yet, that's okay
+      if (error.code !== "ENOENT") {
+        console.warn("Could not create backup:", error.message);
+      }
+    }
+
     const data = {
       sellers: sellers,
     };
-    await fs.writeFile(SELLERS_FILE, JSON.stringify(data, null, 2), "utf8");
+
+    const jsonString = JSON.stringify(data, null, 2);
+
+    // Write to temporary file first, then rename (atomic operation)
+    const tempFile = `${SELLERS_FILE}.tmp`;
+    await fs.writeFile(tempFile, jsonString, "utf8");
+
+    // Verify the temp file was written correctly
+    const verifyData = await fs.readFile(tempFile, "utf8");
+    JSON.parse(verifyData); // Will throw if invalid
+
+    // Atomic rename (this should work on most systems)
+    await fs.rename(tempFile, SELLERS_FILE);
+
     return true;
   } catch (error) {
     console.error("Error saving sellers:", error.message);
+
+    // Try to restore backup if it exists
+    if (backupData) {
+      try {
+        await fs.writeFile(SELLERS_FILE, backupData, "utf8");
+        console.log("Restored backup of sellers.json");
+      } catch (restoreError) {
+        console.error("Failed to restore backup:", restoreError.message);
+      }
+    }
+
+    // Clean up temp file if it exists
+    try {
+      await fs.unlink(`${SELLERS_FILE}.tmp`).catch(() => {});
+    } catch (unlinkError) {
+      // Ignore cleanup errors
+    }
+
     return false;
   }
 }
@@ -48,7 +128,15 @@ async function saveSellers(sellers) {
  * @returns {Promise<Object>} Result object
  */
 async function addSeller(storeName, ssn, type) {
-  const sellers = await loadSellers();
+  let sellers;
+  try {
+    sellers = await loadSellers();
+  } catch (error) {
+    return {
+      success: false,
+      message: `Failed to load sellers: ${error.message}`,
+    };
+  }
 
   if (type !== "listings" && type !== "sold") {
     return {
@@ -114,7 +202,15 @@ async function addSeller(storeName, ssn, type) {
  * @returns {Promise<Object>} Result object
  */
 async function removeSeller(ssn, type) {
-  const sellers = await loadSellers();
+  let sellers;
+  try {
+    sellers = await loadSellers();
+  } catch (error) {
+    return {
+      success: false,
+      message: `Failed to load sellers: ${error.message}`,
+    };
+  }
   const initialLength = sellers.length;
 
   // Support both ssn and username for backward compatibility
@@ -150,11 +246,17 @@ async function removeSeller(ssn, type) {
  * @returns {Promise<Array>} Array of seller objects
  */
 async function getAllSellers(type = null) {
-  const sellers = await loadSellers();
-  if (type) {
-    return sellers.filter((s) => s.type === type);
+  try {
+    const sellers = await loadSellers();
+    if (type) {
+      return sellers.filter((s) => s.type === type);
+    }
+    return sellers;
+  } catch (error) {
+    console.error("Error in getAllSellers:", error.message);
+    // Return empty array on error to prevent crashes
+    return [];
   }
-  return sellers;
 }
 
 /**
@@ -165,7 +267,15 @@ async function getAllSellers(type = null) {
  * @returns {Promise<Object>} Result object
  */
 async function updateSeller(ssn, updates, type = null) {
-  const sellers = await loadSellers();
+  let sellers;
+  try {
+    sellers = await loadSellers();
+  } catch (error) {
+    return {
+      success: false,
+      message: `Failed to load sellers: ${error.message}`,
+    };
+  }
   // Find seller by ssn/username and type (if provided)
   const sellerIndex = sellers.findIndex(
     (s) =>
